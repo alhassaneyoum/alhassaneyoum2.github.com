@@ -12,7 +12,7 @@ Les objectifs principaux sont :
 - Fournir des visualisations claires et informatives pour interpréter les données.
 
 
-## Fonctionnalités
+## Structure du projet
 
 1. **Extraction de données via Web Scraping**
    - Récupération des titres, genres, et commentaires des séries télévisées depuis Allociné.
