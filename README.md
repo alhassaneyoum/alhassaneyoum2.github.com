@@ -4,6 +4,7 @@ Projet-R-Web-Scraping
 
 ## Description du Projet
 
+
 Ce projet explore les caractéristiques des meilleures séries télévisées listées sur le site Allociné. Il vise à mettre en lumière les genres dominants et à analyser les sentiments des spectateurs à travers leurs commentaires. 
 
 Les objectifs principaux sont :
