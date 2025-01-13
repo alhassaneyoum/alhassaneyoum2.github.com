@@ -317,7 +317,7 @@ Ce graphique montre une répartition égale entre les commentaires neutres et po
 
 ```{r}
 
-# Exemple de commentaires nettoyés (utilisez votre liste `comments_clean`)
+# Nettoyages des commentaires
 comments_clean <- tolower(comments_clean)   # Convertir en minuscules
 comments_clean <- gsub("[[:punct:]]", " ", comments_clean)  # Retirer la ponctuation
 comments_clean <- gsub("[[:digit:]]", " ", comments_clean)  # Retirer les chiffres
