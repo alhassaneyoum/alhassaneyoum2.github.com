@@ -1,0 +1,395 @@
+---
+title: "Projet programmation"
+author: "AL Hassane YOUM"
+date: "2025-01-13"
+output:
+  slidy_presentation: default
+  powerpoint_presentation: default
+  beamer_presentation: default
+---
+
+## Intitulé
+
+##### Analyse des Genres et Sentiments des meilleures Séries Télévisées : Une Étude des Données Allociné
+
+## Objectif
+
+L’objectif de ce projet est d’explorer les caractéristiques des meilleures séries télévisées répertoriées sur le site Allociné, en mettant en lumière les genres les plus représentés et en analysant les sentiments des spectateurs à partir des commentaires publiés. À travers des visualisations et des analyses qualitatives, ce projet vise à identifier les tendances dans les préférences des spectateurs et à dégager des perspectives sur la perception globale des séries.
+
+## Méthodologie
+
+Dans un premier temps, nous allons récupérer les titres, genres, et commentaires associés aux 200 meilleures séries selon Allociné à l'aide de techniques de web scraping. Ensuite, Nettoyer et structurer les données extraites (NA, doublons, etc.).
+
+Après, nous allons réaliser une analyse descriptive pour identifier les genres les plus fréquents parmi les séries puis construire des visualisations pour mettre en évidence les genres les plus représentés.
+
+Nous allons aussi essayer d’analyser les sentiments de la première meilleure série :
+
+-   Traiter les commentaires des spectateurs en effectuant une analyse des sentiments
+
+-   Catégoriser les commentaires en sentiments positifs, neutres et négatifs.
+
+-   Visualiser les résultats à l’aide de graphiques pour illustrer la répartition des sentiments.
+
+Nous allons utiliser des outils comme des nuages de mots pour explorer les thèmes les plus récurrents dans les commentaires.
+
+Enfin, nous allons interpréter les résultats.
+
+### Packages
+
+```{r}
+library(stringr)
+library(rvest)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(wordcloud)
+library(RColorBrewer)
+```
+
+#### I. Analyses des 150 meilleures séries de tous les temps sur aAllociné
+
+```{r}
+
+url <- "https://www.allocine.fr/series/meilleures/"  
+#Lien de la page contenant les séries les mieux notées
+
+page <- read_html(url) 
+# Récupération du contenu HTML de la page
+
+
+notes <- page %>%
+  html_nodes(".rating-item-content") %>%  # Sélection des éléments HTML correspondant aux notes
+  html_text()  
+# Extraction du texte brut des éléments sélectionnés
+
+
+print("Notes brutes :")  # Afficher un titre pour identifier les données extraites
+print(notes)  # Afficher les notes brutes pour vérifier le résultat
+
+
+notes_clean <- str_extract(notes, "\\d,\\d") 
+# cette ligne permet d'extraire uniquement les valeurs numériques au format x,y
+
+
+notes_presse <- notes[str_detect(notes, "Presse")] %>%  
+# Pour filtrer uniquement les notes associées à la presse
+  str_extract("\\d,\\d")  
+# Extraire les valeurs numériques au format x,y pour la presse
+
+
+notes_spectateurs <- notes[str_detect(notes, "Spectateurs")] %>%  
+# Filtrer uniquement les notes spectateurs
+  str_extract("\\d,\\d") 
+# Extraire les valeurs numériques au format x,y pour les spectateurs
+
+# Afficher les résultats
+print(notes_presse)  # Afficher les notes Presse nettoyées
+print(notes_spectateurs)  # Afficher les notes Spectateurs nettoyées
+
+```
+
+Interprètations: Les notes de presse varient entre 3,7 et 4,3, indiquant une appréciation généralement positive des critiques, bien que certaines séries n'aient pas de note de presse (NA). Les notes des spectateurs sont plus élevées, allant de 4,5 à 4,7, suggérant que le public apprécie davantage les séries. L'écart entre les notes de presse et les notes spectateurs reflète probablement une divergence d'opinions entre les critiques professionnels et les spectateurs. Les valeurs "NA" dans les notes de presse signalent des absences de critiques ou de notes pour certaines séries
+
+##### Commentaire code
+
+```{r}
+# Extraction des genres et années de sortie
+details <- page %>%
+  html_nodes(".meta-body-item.meta-body-info") %>%  
+# Ce bout de code permet d'extractaire les genres des séries
+
+
+#la fonction html_modes Sélectionne des éléments spécifiques dans une page HTML en utilisant des sélecteurs CSS
+  html_text(trim = TRUE)  
+
+
+# Pour extraire les genres en supprimant les sauts de ligne et les espaces
+genres <- details %>%
+  str_extract("([A-Za-zé,\\s]+)$") %>%  
+# Extraction des genres (lettres et espaces) à la fin du texte
+  str_replace_all("\\s+", " ") %>%     
+#Cette ligne permet de remplacer les multiples espaces par un seul espace
+  str_trim()                            
+# Pour Suppression des espaces au début et à la fin
+
+
+head(genres)  
+# Afficher les premiers genres
+
+```
+
+```{r}
+
+# Fonction pour extraire les titres et genres d'une page
+get_series_info <- function(page_number) {
+# C'est pour générer l'URL de la page en utilisant le numéro de la page
+  url <- paste0("https://www.allocine.fr/series/meilleures/?page=", page_number)
+  page <- read_html(url)  # Lire la page HTML
+
+#la fonction read_html télécharge le contenu de l'URL et le rend disponible sous forme d'un document HTML pour une manipulation ultérieure.
+  
+# Extraction des titres des séries
+  titles <- page %>%
+    html_nodes(".meta-title-link") %>%  
+# Sélectionner les éléments HTML contenant les titres
+    html_text(trim = TRUE)  
+# Extraire le texte des titres et enlever les espaces superflus
+  
+# Extraction des détails des séries (incluant les genres)
+  details <- page %>%
+    html_nodes(".meta-body-item.meta-body-info") %>% 
+# Sélectionner les éléments contenant les genres
+    html_text(trim = TRUE)  
+# Extraire le texte brut et enlever les espaces inutiles
+  
+# Extraction et nettoyage des genres
+  genres <- details %>%
+    str_extract("^([A-Za-z,\\s]+)") %>% 
+# Extraire les genres (lettres, virgules et espaces au début de la chaîne)
+    str_replace_all("\n", "") %>%  
+# Supprimer les retours à la ligne
+    str_replace_all("\\s+", " ") %>%
+# Remplacer les multiples espaces par un seul
+    str_trim()  
+# Enlever les espaces avant et après le texte
+  
+# Vérification et alignement des données
+  n <- min(length(titles), length(genres))  
+# Assurer que les titres et genres ont la même longueur
+  titles <- titles[1:n]  
+# Limiter les titres à la longueur minimale
+  genres <- genres[1:n]  
+# Limiter les genres à la longueur minimale
+  
+# Retourner un tableau avec les titres et genres des séries
+  data.frame(
+    Title = titles,
+    Genre = genres,
+    stringsAsFactors = FALSE  # Ne pas convertir les chaînes en facteurs
+  )
+}
+
+# Initialisation d'un tableau vide pour stocker les informations de toutes les pages
+series_data <- data.frame()
+
+#sur Allociné chaque page content 15 séries
+
+# Itération sur les pages pour obtenir les 200 premières séries
+for (i in 1:10) {  # Boucle sur 10 pages (10 x 15 = 150 séries environ)
+  page_data <- get_series_info(i)  # Extraire les informations de la page courante
+  series_data <- bind_rows(series_data, page_data)
+  # Ajouter les données de la page à la base de données principale
+}
+
+# Vérification des résultats
+print(nrow(series_data))  # Afficher le nombre total de séries extraites
+head(series_data, 15)     # Afficher les 15 premières séries extraites
+
+```
+
+```{r}
+# Séparer les genres dans des lignes individuelles
+genre_data <- series_data %>%
+  separate_rows(Genre, sep = ",") %>%  # Séparer les genres par une virgule et créer une ligne pour chaque genre
+  mutate(Genre = str_trim(Genre))       # Supprimer les espaces inutiles autour de chaque genre
+
+# Compter les occurrences de chaque genre
+genre_counts <- genre_data %>%
+  group_by(Genre) %>%              # Grouper les données par genre
+  summarise(Count = n()) %>%       # Compter combien de fois chaque genre apparaît
+  arrange(desc(Count))             # Trier les genres par ordre décroissant des occurrences
+
+# Afficher les genres les plus fréquents
+print(genre_counts)  # Affiche le tableau des genres et de leurs fréquences
+
+```
+
+L'analyse des genres des séries montre que **le genre Drame** est de loin le plus populaire, représentant une part importante des séries étudiées avec **87 occurrences**. Les genres **Animation (29)**, **Thriller (28)** et **Action (26)** suivent avec des fréquences relativement élevées, montrant une préférence pour les séries d'action et d'aventure. En revanche, les genres comme **Policier (20)**, **Aventure (18)** et **Science Fiction (14)** sont moins représentés, mais ils continuent d'attirer un certain public, bien que leur présence soit inférieure.
+
+```{r}
+
+# Séparer les genres en lignes individuelles
+genre_data <- series_data %>%
+  separate_rows(Genre, sep = ",") %>%  # Séparer les genres multiples en lignes différentes
+  mutate(Genre = str_trim(Genre))      # Enlever les espaces inutiles autour des genres
+
+# Compter les occurrences de chaque genre
+genre_counts <- genre_data %>%
+  group_by(Genre) %>%
+  summarise(Count = n()) %>%
+  arrange(desc(Count))
+
+# Regrouper les genres moins fréquents dans "Autres"
+# Conserver les 10 genres les plus représentés
+top_genres <- genre_counts %>%
+  slice_max(Count, n = 10)  # Les 10 genres les plus fréquents
+
+# Ajouter les genres restants à la catégorie "Autres"
+genre_counts <- genre_counts %>%
+  mutate(Genre = ifelse(Genre %in% top_genres$Genre, Genre, "Autres")) %>%
+  group_by(Genre) %>%
+  summarise(Count = sum(Count)) %>%
+  arrange(desc(Count))
+
+# Calcul des pourcentages
+genre_counts <- genre_counts %>%
+  mutate(Percentage = (Count / sum(Count)) * 100)
+
+# Étape 4 : Créer le diagramme circulaire (Camembert) avec les pourcentages
+ggplot(genre_counts, aes(x = "", y = Count, fill = Genre)) +
+  geom_bar(stat = "identity", width = 1) +  # Créer le bar chart
+  coord_polar(theta = "y") +  # Transformer le bar chart en diagramme circulaire
+  theme_void() +  # Supprimer les axes et arrière-plan
+  labs(title = "Répartition des genres dans les 150 meilleures séries (10 premiers genres)") +
+  geom_text(aes(label = paste0(round(Percentage, 1), "%")), 
+            position = position_stack(vjust = 0.5),  # Placer le texte au centre des sections
+            color = "white", size = 4) +  # Couleur du texte et taille
+  theme(legend.title = element_blank())  # Enlever le titre de la légende
+```
+
+Ce diagramme circulaire montre que le genre Drame domine largement les 150 meilleures séries avec 26,2 %, suivi des séries Historiques (15,7 %). Les genres Fantastique (8,7 %) et Animation (7,8 %) occupent des places importantes, reflétant une diversité des goûts. Les genres comme le Policier, la Science-Fiction et le Thriller ont des parts plus modestes, entre 4 % et 8 %. Cela indique une préférence marquée pour des genres immersifs et émotionnels, tout en laissant une place à des goûts variés. Globalement, les spectateurs apprécient une large palette de séries, avec un fort attrait pour les récits profonds et historiques.
+
+#### II. Analyse des commentaires de la meilleure série sur Allociné
+
+```{r}
+
+# URL de la série
+url <- "https://www.allocine.fr/series/ficheserie_gen_cserie=3517.html"
+
+# Lire la page HTML
+page <- read_html(url)
+
+# Extraire les commentaires
+comments <- page %>%
+  html_nodes(".content-txt") %>%  # Sélecteur CSS pour les commentaires
+  html_text()
+
+# Vérifier les commentaires extraits
+head(comments, 10)
+
+# Nettoyer les commentaires
+comments_clean <- comments %>%
+  gsub("[\n\r]", " ", .) %>%  # Remplacer les sauts de ligne par des espaces
+  trimws()  # Supprimer les espaces inutiles
+
+# Afficher les commentaires nettoyés
+head(comments_clean, 10)
+
+# Lexique simplifié
+positive_words <- c("bien", "excellent", "parfait", "magnifique", "intéressant", "super")
+negative_words <- c("mauvais", "horrible", "nul", "ennuyeux", "décevant", "pire")
+
+# Calculer les scores de sentiment
+sentiment_scores <- sapply(comments_clean, function(comment) {
+  pos <- sum(sapply(positive_words, function(word) grepl(word, comment, ignore.case = TRUE)))
+  neg <- sum(sapply(negative_words, function(word) grepl(word, comment, ignore.case = TRUE)))
+  pos - neg
+})
+
+# Associer les scores aux commentaires
+comments_data <- data.frame(
+  Comment = comments_clean,
+  Sentiment = sentiment_scores
+)
+
+# Vérifier les résultats
+head(comments_data, 10)
+
+
+# Ajouter une colonne pour les types de sentiments
+comments_data <- comments_data %>%
+  mutate(SentimentType = ifelse(Sentiment > 0, "Positif", 
+                                ifelse(Sentiment < 0, "Négatif", "Neutre")))
+
+# Résumé des sentiments
+sentiment_summary <- comments_data %>%
+  group_by(SentimentType) %>%
+  summarise(Count = n())
+
+# Créer un diagramme circulaire
+ggplot(sentiment_summary, aes(x = "", y = Count, fill = SentimentType)) +
+  geom_bar(stat = "identity", width = 1) +
+  coord_polar("y") +
+  labs(title = "Répartition des sentiments des commentaires", x = "", y = "") +
+  theme_minimal() +
+  theme(axis.text.x = element_blank())
+```
+
+Ce graphique montre une répartition égale entre les commentaires neutres et positifs. Chaque type de sentiment représente 50 % des commentaires analysés. Cela indique un équilibre dans les réactions des utilisateurs, avec autant de neutralité que d'enthousiasme dans les retours. Le nombre de commentaire négatif est petit par par rapport aux commentaires positifs et neutres, ce qui pourrait suggérer une perception globalement favorable ou des critères de tri spécifiques pour les données. Cette distribution reflète un ton globalement positif et modéré dans les commentaires.
+
+```{r}
+
+# Exemple de commentaires nettoyés (utilisez votre liste `comments_clean`)
+comments_clean <- tolower(comments_clean)   # Convertir en minuscules
+comments_clean <- gsub("[[:punct:]]", " ", comments_clean)  # Retirer la ponctuation
+comments_clean <- gsub("[[:digit:]]", " ", comments_clean)  # Retirer les chiffres
+comments_clean <- gsub("\\s+", " ", comments_clean)        # Réduire les espaces multiples
+
+# Séparer les mots
+words <- unlist(strsplit(comments_clean, " "))
+
+# Vérifier qu'il y a des mots après séparation
+if(length(words) == 0) {
+  stop("Aucun mot trouvé dans les commentaires après nettoyage.")
+}
+
+# Liste des mots vides (stop words) en français
+stop_words <- c("le", "la", "les", "un", "une", "des", "et", "en", 
+                "à", "au", "aux", "du", "de", "dans", "ce", "cette",
+                "pour", "par", "avec", "il", "elle", "on", "nous", 
+                "vous", "ils", "elles", "que", "qui", "quoi", "où",
+                "ne", "pas", "mais", "ou", "donc", "car", "ni", 
+                "sont", "ces", "sa", "son", "ses", "mon", "ma", "mes",
+                "ta", "ton", "tes", "leur", "leurs", "même", "être", 
+                "avoir", "faire", "ceci", "cela", "ça", "série", "film", "tout", "plus", "est", "je", "lui", "l", "d")
+
+# Retirer les mots vides
+words <- words[!(words %in% stop_words)]
+
+# Vérifier si, après nettoyage, il reste des mots
+if(length(words) == 0) {
+  stop("Aucun mot après retrait des mots vides.")
+}
+
+# Calculer la fréquence des mots
+word_freq <- table(words)
+
+# Vérifier si le tableau des fréquences est vide
+if(length(word_freq) == 0) {
+  stop("Aucune fréquence calculée. Le tableau est vide.")
+}
+
+# Créer un data frame à partir des fréquences
+word_freq_df <- data.frame(
+  word = names(word_freq),
+  freq = as.integer(word_freq)
+)
+
+# Retirer les mots vides supplémentaires ou non valides (par exemple, les blancs)
+word_freq_df <- word_freq_df[word_freq_df$freq > 0, ]
+
+# Vérifier les premiers résultats
+head(word_freq_df)
+
+# Si des mots sont trouvés, générer le nuage de mots
+if(nrow(word_freq_df) > 0) {
+  set.seed(123)  # Pour des résultats reproductibles
+  wordcloud(
+    words = word_freq_df$word,
+    freq = word_freq_df$freq,
+    min.freq = 2,               # Afficher les mots avec une fréquence >= 2
+    max.words = 100,            # Nombre maximum de mots affichés
+    random.order = FALSE,       # Afficher les mots les plus fréquents au centre
+    colors = brewer.pal(8, "Dark2")  # Palette de couleurs
+  )
+} else {
+  stop("Aucun mot valable à afficher dans le nuage de mots.")
+}
+
+```
+
+Ce nuage de mots illustre les termes les plus fréquemment mentionnés dans les commentaires, reflétant les thèmes et sujets dominants. Les mots "lire", "saison", "breaking", et "bad" sont particulièrement mis en évidence, indiquant probablement des discussions centrées sur la série Breaking Bad et ses différentes saisons. Les noms "Walter", "Gilligan", et "Bryan" font référence aux acteurs et au créateur, suggérant leur importance dans les retours. Des mots comme "chimie", "crystal", et "labo" rappellent des éléments clés de l'intrigue de la série. Ce nuage de mots met en avant à la fois les aspects narratifs et la perception des spectateurs
+
+## Conclusion
+
+En conclusion, cette étude a révélé les genres les plus représentés parmi les meilleures séries selon Allociné, avec une dominance notable des genres comme le drame et le fantastique. L’analyse des sentiments des spectateurs a mis en lumière une majorité d’avis positifs, témoignant de l'appréciation générale des séries étudiées. Les visualisations, comme les nuages de mots et les graphiques, ont permis d’identifier les thèmes récurrents et les émotions les plus associées aux séries populaires. Ces résultats offrent une meilleure compréhension des préférences des spectateurs et des tendances actuelles dans l'univers des séries télévisées.
